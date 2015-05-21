@@ -25,7 +25,7 @@
                 "type": "png"
             },
             {
-                "characterRegex": "[0-9:]",
+                "characterRegex": "[0-9 :]",
                 "file": "fonts/PBL_Hora.ttf",
                 "name": "FUENTE_HORA_64",
                 "trackingAdjust": -8,

@@ -263,7 +263,8 @@ static void update_minutes(struct tm *tick_time) {
     if (clock_is_24h_style()) 
 	    strftime(s_time_text, sizeof(s_time_text), "%R:%M", tick_time);
      else 
-	     strftime(s_time_text, sizeof(s_time_text), "%I:%M", tick_time);
+	     strftime(s_time_text, sizeof(s_time_text), "%l:%M", tick_time);      
+
     text_layer_set_text(text_layer_hora, s_time_text);
 }
 
@@ -386,6 +387,7 @@ static void init(void) {
   
   text_layer_hora = text_layer_create((GRect) { .origin = { 7, 69 }, .size = { 100, 70 } });
   text_layer_set_font(text_layer_hora, fuente_hora);
+  text_layer_set_text_alignment(text_layer_hora, GTextAlignmentRight);
   text_layer_set_background_color(text_layer_hora, GColorClear);
   layer_add_child(window_layer, text_layer_get_layer(text_layer_hora));
   
