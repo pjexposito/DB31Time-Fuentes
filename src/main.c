@@ -34,7 +34,7 @@ bool DATEFORMAT;
   
 
 // Vibra al perder la conexión BT  
-int BluetoothVibe;
+static int BluetoothVibe;
 
 // Vibrar en el cambio de hora
 static int HourlyVibe;
@@ -76,6 +76,7 @@ static void carga_preferencias(void)
     BluetoothVibe = persist_exists(KEY_VIBE) ? persist_read_int(KEY_VIBE) : 1;
     SEGUNDOS = persist_exists(KEY_SEGUNDOS) ? persist_read_int(KEY_SEGUNDOS) : 1;
     HourlyVibe = persist_exists(KEY_HOURLYVIBE) ? persist_read_int(KEY_HOURLYVIBE) : 0;
+  
   }
 
 static void handle_tick(struct tm *tick_time, TimeUnits units_changed);
@@ -118,18 +119,22 @@ static void in_recv_handler(DictionaryIterator *iterator, void *context)
   // Vuelve a dibujar el reloj tras cerrar las preferencias
   carga_preferencias();
   
+    if (BluetoothVibe)
+    layer_set_hidden(bitmap_layer_get_layer(meter_bar_layer), false);
+  else
+    layer_set_hidden(bitmap_layer_get_layer(meter_bar_layer), true);
+  
   if(SEGUNDOS)
   {
     tick_timer_service_subscribe(SECOND_UNIT, handle_tick);
-    // OBSOLETO layer_set_hidden(bitmap_layer_get_layer(seg_digits_layers[0]), false);
-    // OBSOLETO layer_set_hidden(bitmap_layer_get_layer(seg_digits_layers[1]), false);    
   }
   else
   {
-    // OBSOLETO layer_set_hidden(bitmap_layer_get_layer(seg_digits_layers[0]), true);
-    // OBSOLETO layer_set_hidden(bitmap_layer_get_layer(seg_digits_layers[1]), true);    
     tick_timer_service_subscribe(MINUTE_UNIT, handle_tick);
   }
+  
+
+
   time_t now = time(NULL);
   struct tm *tick_time = localtime(&now);  
   handle_tick(tick_time, YEAR_UNIT + MONTH_UNIT + DAY_UNIT + HOUR_UNIT + MINUTE_UNIT + SECOND_UNIT);
