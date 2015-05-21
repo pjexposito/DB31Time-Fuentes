@@ -20,6 +20,11 @@
                 "type": "png"
             },
             {
+                "file": "images/icon_meter.png",
+                "name": "IMAGE_METER_BAR",
+                "type": "png"
+            },
+            {
                 "characterRegex": "[0-9:]",
                 "file": "fonts/PBL_Hora.ttf",
                 "name": "FUENTE_HORA_64",
@@ -57,28 +62,8 @@
                 "type": "png"
             },
             {
-                "file": "images/sepames.png",
-                "name": "IMAGE_SEPAMES",
-                "type": "png"
-            },
-            {
-                "file": "images/tilde.png",
-                "name": "IMAGE_TILDE",
-                "type": "png"
-            },
-            {
-                "file": "images/separador.png",
-                "name": "IMAGE_SEPARATOR",
-                "type": "png"
-            },
-            {
                 "file": "images/icon_bluetooth.png",
                 "name": "IMAGE_BLUETOOTH",
-                "type": "png"
-            },
-            {
-                "file": "images/icon_meter.png",
-                "name": "IMAGE_METER_BAR",
                 "type": "png"
             },
             {

@@ -47,20 +47,11 @@ static bool appStarted = false;
 static GBitmap *background_image;
 static BitmapLayer *background_layer;
 
-static GBitmap *separator_image;
-static BitmapLayer *separator_layer;
-
 static GBitmap *meter_bar_image;
 static BitmapLayer *meter_bar_layer;
 
 static GBitmap *bluetooth_image;
 static BitmapLayer *bluetooth_layer;
-
-static GBitmap *tilde_image;
-static BitmapLayer *tilde_layer;
-
-static GBitmap *sepames_image;
-static BitmapLayer *sepames_layer;
 
 static GBitmap *porcentaje_image;
 static BitmapLayer *porcentaje_layer;
@@ -70,6 +61,8 @@ static BitmapLayer *battery_image_layer;
 static BitmapLayer *battery_layer;
 
 static GBitmap *time_format_image;
+static GBitmap *time_format_image24;
+
 static BitmapLayer *time_format_layer;
 
 
@@ -248,6 +241,16 @@ static void update_hours(struct tm *tick_time) {
   if(appStarted && HourlyVibe) {
     vibes_short_pulse();
   }
+  if (!clock_is_24h_style()) {
+    if (tick_time->tm_hour >= 12) {
+          bitmap_layer_set_bitmap(time_format_layer, time_format_image); 
+
+      layer_set_hidden(bitmap_layer_get_layer(time_format_layer), false);
+    } 
+    else {
+      layer_set_hidden(bitmap_layer_get_layer(time_format_layer), true);
+    }
+}
 }
 
 static void update_minutes(struct tm *tick_time) {
@@ -304,17 +307,6 @@ static void init(void) {
   layer_add_child(window_layer, bitmap_layer_get_layer(background_layer));
 
   
-   separator_image = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_SEPARATOR);
-  #ifdef PBL_PLATFORM_BASALT
-    GRect bitmap_bounds = gbitmap_get_bounds(separator_image);
-  #else
-    GRect bitmap_bounds = separator_image->bounds;
-  #endif
-  GRect frame = GRect(53, 105, bitmap_bounds.size.w, bitmap_bounds.size.h);
-  
-  separator_layer = bitmap_layer_create(frame);
-  bitmap_layer_set_bitmap(separator_layer, separator_image);
-  layer_add_child(window_layer, bitmap_layer_get_layer(separator_layer));   
   
   
   porcentaje_image = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_TINY_PERCENT);
@@ -374,33 +366,15 @@ static void init(void) {
     .size = {.w = 19, .h = 8}
   };
   time_format_layer = bitmap_layer_create(frame5);
+  time_format_image24 = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_24_HOUR_MODE);
+  time_format_image = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_PM_MODE);
+
   if (clock_is_24h_style()) {
-    time_format_image = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_24_HOUR_MODE);
-    bitmap_layer_set_bitmap(time_format_layer, time_format_image); 
+    time_format_image24 = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_24_HOUR_MODE);
+    bitmap_layer_set_bitmap(time_format_layer, time_format_image24); 
   }
   layer_add_child(window_layer, bitmap_layer_get_layer(time_format_layer));
-  tilde_image = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_TILDE);
-  #ifdef PBL_PLATFORM_BASALT
-    GRect bitmap_bounds6 = gbitmap_get_bounds(tilde_image);
-  #else
-    GRect bitmap_bounds6 = tilde_image->bounds;
-  #endif
-  GRect frame6 = GRect(99, 42, bitmap_bounds6.size.w, bitmap_bounds6.size.h);
-                                  
-  tilde_layer = bitmap_layer_create(frame6);
-  bitmap_layer_set_bitmap(tilde_layer, tilde_image);
-  layer_add_child(window_layer, bitmap_layer_get_layer(tilde_layer));
   
-  sepames_image = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_SEPAMES);
-  #ifdef PBL_PLATFORM_BASALT
-    GRect bitmap_bounds7 = gbitmap_get_bounds(sepames_image);
-  #else
-    GRect bitmap_bounds7 = sepames_image->bounds;
-  #endif
-  GRect frame7 = GRect(101, 79, bitmap_bounds7.size.w, bitmap_bounds7.size.h);
-  sepames_layer = bitmap_layer_create(frame7);
-  bitmap_layer_set_bitmap(sepames_layer, sepames_image);
-  layer_add_child(window_layer, bitmap_layer_get_layer(sepames_layer));
   
  
   // EMPIEZAN LOS CARACTERES
@@ -482,11 +456,6 @@ static void deinit(void) {
   gbitmap_destroy(background_image);
   background_image = NULL;
   
-  layer_remove_from_parent(bitmap_layer_get_layer(separator_layer));
-  bitmap_layer_destroy(separator_layer);
-  gbitmap_destroy(separator_image);
-  separator_image = NULL;
-  
   layer_remove_from_parent(bitmap_layer_get_layer(meter_bar_layer));
   bitmap_layer_destroy(meter_bar_layer);
   gbitmap_destroy(meter_bar_image);
@@ -501,16 +470,6 @@ static void deinit(void) {
   bitmap_layer_destroy(battery_layer);
   gbitmap_destroy(battery_image);
   battery_image = NULL;
-  
-  layer_remove_from_parent(bitmap_layer_get_layer(tilde_layer));
-  bitmap_layer_destroy(tilde_layer);
-  gbitmap_destroy(tilde_image);
-  tilde_image = NULL;
-  
-  layer_remove_from_parent(bitmap_layer_get_layer(sepames_layer));
-  bitmap_layer_destroy(sepames_layer);
-  gbitmap_destroy(sepames_image);
-  sepames_image = NULL;
 	
   layer_remove_from_parent(bitmap_layer_get_layer(battery_image_layer));
   bitmap_layer_destroy(battery_image_layer);
