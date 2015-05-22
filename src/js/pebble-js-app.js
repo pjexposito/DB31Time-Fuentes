@@ -2,21 +2,21 @@
 
 Pebble.addEventListener("ready",
   function(e) {
-    console.log("Pebblejs cargado");
+    //console.log("Pebblejs cargado");
   }
 );
 
 Pebble.addEventListener("showConfiguration",
   function(e) {
     //Carga la web de configuración
-    Pebble.openURL("https://dl.dropboxusercontent.com/u/119376/config.html");
+    Pebble.openURL("https://dl.dropboxusercontent.com/u/119376/config-time.html");
   }
 );
 
 Pebble.addEventListener("webviewclosed",
   function(e) {
     var configuration = JSON.parse(decodeURIComponent(e.response));
-    console.log("Datos devueltos: " + JSON.stringify(configuration));
+    //console.log("Datos devueltos: " + JSON.stringify(configuration));
  
     //Send to Pebble, persist there
     Pebble.sendAppMessage(
@@ -29,10 +29,10 @@ Pebble.addEventListener("webviewclosed",
 
       },
       function(e) {
-        console.log("Mandando datos...");
+        //console.log("Mandando datos...");
       },
       function(e) {
-        console.log("Error al mandar datos");
+        //console.log("Error al mandar datos");
       }
     );
   }

@@ -25,22 +25,23 @@ static TextLayer *text_layer_hora, *text_layer_segundos, *text_layer_fecha1, *te
 
 
 int IDIOMA;  
-// IDIOMA = 1, texto en español
 // IDIOMA = 0, text in english  
+// IDIOMA = 1, texto en español
+// IDIOMA = 2, texto en frances
   
-bool DATEFORMAT;
-// DATEFORMAT = 1, Formato europeo (DD/MM/AAAA)
-// DATEFORMAT = 0, Formato americano (MM/DD/AAAA)
+static bool DATEFORMAT;
+// DATEFORMAT = True, Formato europeo (DD/MM/AAAA)
+// DATEFORMAT = False, Formato americano (MM/DD/AAAA)
   
 
-// Vibra al perder la conexión BT  
-static int BluetoothVibe;
+// Vibra al perder la conexión BT. True es si, false es no.
+static bool BluetoothVibe;
 
-// Vibrar en el cambio de hora
-static int HourlyVibe;
+// Vibrar en el cambio de hora. True es si, false es no.
+static bool HourlyVibe;
 
-// Si es 1 se muestra el segundero. Si es 0, desaparece.
-static int SEGUNDOS;
+// True muestra el segundero. Con False, desaparece.
+static bool SEGUNDOS;
 
 static bool appStarted = false;
 
@@ -73,9 +74,9 @@ static void carga_preferencias(void)
     // Carga las preferencias
     IDIOMA = persist_exists(KEY_IDIOMA) ? persist_read_int(KEY_IDIOMA) : 0;
     DATEFORMAT = persist_exists(KEY_DATEFORMAT) ? persist_read_bool(KEY_DATEFORMAT) : 0;
-    BluetoothVibe = persist_exists(KEY_VIBE) ? persist_read_int(KEY_VIBE) : 1;
-    SEGUNDOS = persist_exists(KEY_SEGUNDOS) ? persist_read_int(KEY_SEGUNDOS) : 1;
-    HourlyVibe = persist_exists(KEY_HOURLYVIBE) ? persist_read_int(KEY_HOURLYVIBE) : 0;
+    BluetoothVibe = persist_exists(KEY_VIBE) ? persist_read_bool(KEY_VIBE) : 1;
+    SEGUNDOS = persist_exists(KEY_SEGUNDOS) ? persist_read_bool(KEY_SEGUNDOS) : 1;
+    HourlyVibe = persist_exists(KEY_HOURLYVIBE) ? persist_read_bool(KEY_HOURLYVIBE) : 0;
   
   }
 
@@ -95,26 +96,37 @@ static void in_recv_handler(DictionaryIterator *iterator, void *context)
     persist_write_int(KEY_IDIOMA, 1);
   else if(strcmp(key_idioma_tuple->value->cstring, "english") == 0)
     persist_write_int(KEY_IDIOMA, 0);
+  else if(strcmp(key_idioma_tuple->value->cstring, "french") == 0)
+    persist_write_int(KEY_IDIOMA, 2);
+  else if(strcmp(key_idioma_tuple->value->cstring, "german") == 0)
+    persist_write_int(KEY_IDIOMA, 3);
+  else if(strcmp(key_idioma_tuple->value->cstring, "italian") == 0)
+    persist_write_int(KEY_IDIOMA, 4);
+  else if(strcmp(key_idioma_tuple->value->cstring, "portuguese") == 0)
+    persist_write_int(KEY_IDIOMA, 5);  
+  else
+    persist_write_int(KEY_IDIOMA, 0);
  
+  
   if(strcmp(key_dateformat_tuple->value->cstring, "DDMM") == 0)
       persist_write_bool(KEY_DATEFORMAT, 1);
   else if(strcmp(key_dateformat_tuple->value->cstring, "MMDD") == 0)
     persist_write_bool(KEY_DATEFORMAT, 0);  
     
   if(strcmp(key_vibe_tuple->value->cstring, "on") == 0)
-      persist_write_int(KEY_VIBE, 1);
+      persist_write_bool(KEY_VIBE, 1);
   else if(strcmp(key_vibe_tuple->value->cstring, "off") == 0)
-      persist_write_int(KEY_VIBE, 0); 
+      persist_write_bool(KEY_VIBE, 0); 
     
   if(strcmp(key_segundos_tuple->value->cstring, "on") == 0)
-      persist_write_int(KEY_SEGUNDOS, 1);
+      persist_write_bool(KEY_SEGUNDOS, 1);
   else if(strcmp(key_segundos_tuple->value->cstring, "off") == 0)
-      persist_write_int(KEY_SEGUNDOS, 0);     
+      persist_write_bool(KEY_SEGUNDOS, 0);     
     
   if(strcmp(key_hourlyvibe_tuple->value->cstring, "on") == 0)
-     persist_write_int(KEY_HOURLYVIBE, 1);
+     persist_write_bool(KEY_HOURLYVIBE, 1);
   else if(strcmp(key_hourlyvibe_tuple->value->cstring, "off") == 0)
-     persist_write_int(KEY_HOURLYVIBE, 0);
+     persist_write_bool(KEY_HOURLYVIBE, 0);
   
   // Vuelve a dibujar el reloj tras cerrar las preferencias
   carga_preferencias();
@@ -132,6 +144,7 @@ static void in_recv_handler(DictionaryIterator *iterator, void *context)
   {
     tick_timer_service_subscribe(MINUTE_UNIT, handle_tick);
   }
+  layer_set_hidden(text_layer_get_layer(text_layer_segundos), !SEGUNDOS);
   
 
 
@@ -160,18 +173,20 @@ static void update_battery(BatteryChargeState charge_state) {
   batteryPercent = charge_state.charge_percent;
   if(batteryPercent==100) 
   {
-	  // Aqui la batería está al 100%
+	  change_battery_icon(false);
+	  layer_set_hidden(bitmap_layer_get_layer(battery_layer), false);
+    layer_set_hidden(text_layer_get_layer(text_layer_bateria),true);
+    layer_set_hidden(bitmap_layer_get_layer(porcentaje_layer),true);
     return;
   }
   layer_set_hidden(bitmap_layer_get_layer(battery_layer), charge_state.is_charging);
   change_battery_icon(charge_state.is_charging);  
+  layer_set_hidden(text_layer_get_layer(text_layer_bateria),charge_state.is_charging);
+  layer_set_hidden(bitmap_layer_get_layer(porcentaje_layer),charge_state.is_charging);
 
   static char s_time_text[] = "00";
   snprintf(s_time_text, sizeof(s_time_text), "%i", charge_state.charge_percent);
   text_layer_set_text(text_layer_bateria, s_time_text); 
-  // OBSOLETO set_container_image(&battery_percent_image[0], battery_percent_layers[0], TINY_IMAGE_RESOURCE_IDS[charge_state.charge_percent/10], GPoint(13, 41));
-  // OBSOLETO set_container_image(&battery_percent_image[1], battery_percent_layers[1], TINY_IMAGE_RESOURCE_IDS[charge_state.charge_percent%10], GPoint(20, 41));
-  // OBSOLETO set_container_image(&battery_percent_image[2], battery_percent_layers[2], TINY_IMAGE_RESOURCE_IDS[10], GPoint(27, 41));
 }
 
 static void toggle_bluetooth_icon(bool connected) {
@@ -200,13 +215,37 @@ void battery_layer_update_callback(Layer *me, GContext* ctx) {
 static void update_days(struct tm *tick_time) {
   const char *dias_es[] = {"DOM", "LUN", "MAR", "MIE", "JUE", "VIE", "SAB"};
   const char *dias_en[] = {"SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"};
+  const char *dias_fr[] = {"DIM", "LUN", "MAR", "MER", "JEU", "VEN", "SAM"};
+  const char *dias_de[] = {"SON", "MON", "DIE", "MIT", "DON", "FRE", "SAM"};
+  const char *dias_it[] = {"DOM", "LUN", "MAR", "MER", "GIO", "VEN", "SAB"};
+  const char *dias_pt[] = {"DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SAB"};
   
-  if (IDIOMA==1)
-  	  text_layer_set_text(text_layer_letras, dias_es[tick_time->tm_wday]); 
-  else
-  	  text_layer_set_text(text_layer_letras, dias_en[tick_time->tm_wday]); 
+  switch (IDIOMA)
+  {
+  case 0:
+    text_layer_set_text(text_layer_letras, dias_en[tick_time->tm_wday]); 
+    break;
+  case 1:
+    text_layer_set_text(text_layer_letras, dias_es[tick_time->tm_wday]); 
+    break;
+  case 2:
+    text_layer_set_text(text_layer_letras, dias_fr[tick_time->tm_wday]); 
+    break;    
+  case 3:
+    text_layer_set_text(text_layer_letras, dias_de[tick_time->tm_wday]); 
+    break;   
+  case 4:
+    text_layer_set_text(text_layer_letras, dias_it[tick_time->tm_wday]); 
+    break;   
+  case 5:
+    text_layer_set_text(text_layer_letras, dias_pt[tick_time->tm_wday]); 
+    break;   
+  default:
+    text_layer_set_text(text_layer_letras, dias_en[tick_time->tm_wday]); 
+    break;    
+  }
 
-  if (DATEFORMAT==1)
+  if (DATEFORMAT)
     {
   	  static char s_time_text[] = "00";
   	  strftime(s_time_text, sizeof(s_time_text), "%d", tick_time);
@@ -221,7 +260,7 @@ static void update_days(struct tm *tick_time) {
 }
 
 static void update_months(struct tm *tick_time) {
-  if (DATEFORMAT==1)
+  if (DATEFORMAT)
   {	  
 	  static char s_time_text[] = "00";
 	  strftime(s_time_text, sizeof(s_time_text), "%m", tick_time);
@@ -269,12 +308,13 @@ static void update_minutes(struct tm *tick_time) {
 }
 
 static void update_seconds(struct tm *tick_time) {
-  if (SEGUNDOS==1)
+  if (SEGUNDOS)
   {
 	  static char s_time_text[] = "00";
 	  strftime(s_time_text, sizeof(s_time_text), "%S", tick_time);
 	  text_layer_set_text(text_layer_segundos, s_time_text);
   }
+
 }
 
 static void handle_tick(struct tm *tick_time, TimeUnits units_changed) {
@@ -286,6 +326,22 @@ static void handle_tick(struct tm *tick_time, TimeUnits units_changed) {
   if (units_changed & SECOND_UNIT) update_seconds(tick_time);
 }
 
+static void crea_capa_texto(TextLayer *t_capa, GRect t_origin,GFont t_fuente, GTextAlignment t_alineacion, GColor t_fondo, Layer *t_window_layer){
+  t_capa = text_layer_create(t_origin);
+  text_layer_set_font(t_capa, t_fuente);
+  text_layer_set_text_alignment(t_capa, t_alineacion);
+  text_layer_set_background_color(t_capa, t_fondo);
+}
+
+static TextLayer* init_text_layer(GRect location, GColor colour, GColor background, GFont fuente, GTextAlignment alignment)
+{
+	TextLayer *layer = text_layer_create(location);
+	text_layer_set_text_color(layer, colour);
+	text_layer_set_background_color(layer, background);
+	text_layer_set_font(layer, fuente);
+	text_layer_set_text_alignment(layer, alignment);
+	return layer;
+}
 
 static void init(void) {
   
@@ -385,11 +441,20 @@ static void init(void) {
  
   // EMPIEZAN LOS CARACTERES
   
+  /*
   text_layer_hora = text_layer_create((GRect) { .origin = { 7, 69 }, .size = { 100, 70 } });
   text_layer_set_font(text_layer_hora, fuente_hora);
   text_layer_set_text_alignment(text_layer_hora, GTextAlignmentRight);
   text_layer_set_background_color(text_layer_hora, GColorClear);
   layer_add_child(window_layer, text_layer_get_layer(text_layer_hora));
+  */
+  
+  text_layer_hora = init_text_layer(GRect(7, 69, 100, 70), GColorBlack, GColorClear, fuente_hora, GTextAlignmentLeft);
+	layer_add_child(window_layer, text_layer_get_layer(text_layer_hora));
+
+  //crea_capa_texto(text_layer_hora, (GRect) {.origin={7,69},.size={100,70}},fuente_hora, GTextAlignmentRight, GColorClear, window_layer);
+  //layer_add_child(window_layer, text_layer_get_layer(text_layer_hora));
+
   
   text_layer_segundos = text_layer_create((GRect) { .origin = { 107, 106 }, .size = { 40, 40 } });
   text_layer_set_font(text_layer_segundos, fuente_segundos);
@@ -431,7 +496,7 @@ static void init(void) {
 
   appStarted = true;
   
-  // Avoids a blank screen on watch start.
+  // Se evita la pantalla blanca al iniciar.
   time_t now = time(NULL);
   struct tm *tick_time = localtime(&now);  
   handle_tick(tick_time, YEAR_UNIT + MONTH_UNIT + DAY_UNIT + HOUR_UNIT + MINUTE_UNIT + SECOND_UNIT);
@@ -443,6 +508,7 @@ static void init(void) {
     tick_timer_service_subscribe(SECOND_UNIT, handle_tick);
   else
     tick_timer_service_subscribe(MINUTE_UNIT, handle_tick);
+  layer_set_hidden(text_layer_get_layer(text_layer_segundos), !SEGUNDOS);
 
   bluetooth_connection_service_subscribe(bluetooth_connection_callback);
   battery_state_service_subscribe(&update_battery);
