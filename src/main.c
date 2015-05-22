@@ -16,7 +16,8 @@
 #define KEY_VIBE 1
 #define KEY_DATEFORMAT 2
 #define KEY_SEGUNDOS 3
-#define KEY_HOURLYVIBE 4  
+#define KEY_HOURLYVIBE 4
+#define KEY_BW 5
   
 static Window *window;
 static Layer *window_layer;
@@ -43,18 +44,18 @@ static bool HourlyVibe;
 // True muestra el segundero. Con False, desaparece.
 static bool SEGUNDOS;
 
+static bool BW;
+
 static bool appStarted = false;
 
 static GBitmap *background_image;
+static GBitmap *background_image_color;
 static BitmapLayer *background_layer;
 
-static GBitmap *meter_bar_image;
 static BitmapLayer *meter_bar_layer;
 
-static GBitmap *bluetooth_image;
 static BitmapLayer *bluetooth_layer;
 
-static GBitmap *porcentaje_image;
 static BitmapLayer *porcentaje_layer;
 
 static GBitmap *battery_image;
@@ -77,6 +78,7 @@ static void carga_preferencias(void)
     BluetoothVibe = persist_exists(KEY_VIBE) ? persist_read_bool(KEY_VIBE) : 1;
     SEGUNDOS = persist_exists(KEY_SEGUNDOS) ? persist_read_bool(KEY_SEGUNDOS) : 1;
     HourlyVibe = persist_exists(KEY_HOURLYVIBE) ? persist_read_bool(KEY_HOURLYVIBE) : 0;
+    BW = persist_exists(KEY_BW) ? persist_read_bool(KEY_BW) : 0;
   
   }
 
@@ -91,6 +93,7 @@ static void in_recv_handler(DictionaryIterator *iterator, void *context)
   Tuple *key_dateformat_tuple = dict_find(iterator, KEY_DATEFORMAT);
   Tuple *key_segundos_tuple = dict_find(iterator, KEY_SEGUNDOS);
   Tuple *key_hourlyvibe_tuple = dict_find(iterator, KEY_HOURLYVIBE);
+  Tuple *key_bw_tuple = dict_find(iterator, KEY_BW);  
 
   if(strcmp(key_idioma_tuple->value->cstring, "spanish") == 0)
     persist_write_int(KEY_IDIOMA, 1);
@@ -127,6 +130,11 @@ static void in_recv_handler(DictionaryIterator *iterator, void *context)
      persist_write_bool(KEY_HOURLYVIBE, 1);
   else if(strcmp(key_hourlyvibe_tuple->value->cstring, "off") == 0)
      persist_write_bool(KEY_HOURLYVIBE, 0);
+
+  if(strcmp(key_bw_tuple->value->cstring, "on") == 0)
+     persist_write_bool(KEY_BW, 1);
+  else if(strcmp(key_bw_tuple->value->cstring, "off") == 0)
+     persist_write_bool(KEY_BW, 0);  
   
   // Vuelve a dibujar el reloj tras cerrar las preferencias
   carga_preferencias();
@@ -146,6 +154,14 @@ static void in_recv_handler(DictionaryIterator *iterator, void *context)
   }
   layer_set_hidden(text_layer_get_layer(text_layer_segundos), !SEGUNDOS);
   
+  
+  #ifdef PBL_COLOR 
+    if (BW)
+      bitmap_layer_set_bitmap(background_layer, background_image);
+    else
+      bitmap_layer_set_bitmap(background_layer, background_image_color);
+  #endif
+
 
 
   time_t now = time(NULL);
@@ -171,6 +187,7 @@ void change_battery_icon(bool charging) {
 
 static void update_battery(BatteryChargeState charge_state) {
   batteryPercent = charge_state.charge_percent;
+
   if(batteryPercent==100) 
   {
 	  change_battery_icon(false);
@@ -179,6 +196,7 @@ static void update_battery(BatteryChargeState charge_state) {
     layer_set_hidden(bitmap_layer_get_layer(porcentaje_layer),true);
     return;
   }
+
   layer_set_hidden(bitmap_layer_get_layer(battery_layer), charge_state.is_charging);
   change_battery_icon(charge_state.is_charging);  
   layer_set_hidden(text_layer_get_layer(text_layer_bateria),charge_state.is_charging);
@@ -191,7 +209,7 @@ static void update_battery(BatteryChargeState charge_state) {
 
 static void toggle_bluetooth_icon(bool connected) {
   if(appStarted && !connected && BluetoothVibe) {
-    static uint32_t const segments[] = { 200, 100, 100, 100, 500 };
+    static uint32_t const segments[] = { 200, 100, 100, 100, 100, 700 };
     VibePattern pat = {
       .durations = segments,
       .num_segments = ARRAY_LENGTH(segments),
@@ -326,14 +344,8 @@ static void handle_tick(struct tm *tick_time, TimeUnits units_changed) {
   if (units_changed & SECOND_UNIT) update_seconds(tick_time);
 }
 
-static void crea_capa_texto(TextLayer *t_capa, GRect t_origin,GFont t_fuente, GTextAlignment t_alineacion, GColor t_fondo, Layer *t_window_layer){
-  t_capa = text_layer_create(t_origin);
-  text_layer_set_font(t_capa, t_fuente);
-  text_layer_set_text_alignment(t_capa, t_alineacion);
-  text_layer_set_background_color(t_capa, t_fondo);
-}
 
-static TextLayer* init_text_layer(GRect location, GColor colour, GColor background, GFont fuente, GTextAlignment alignment)
+static TextLayer* crea_capa_texto(GRect location, GColor colour, GColor background, GFont fuente, GTextAlignment alignment)
 {
 	TextLayer *layer = text_layer_create(location);
 	text_layer_set_text_color(layer, colour);
@@ -343,16 +355,31 @@ static TextLayer* init_text_layer(GRect location, GColor colour, GColor backgrou
 	return layer;
 }
 
+static BitmapLayer* crea_capa_grafica(int x, int y, const uint8_t IMAGEN, bool Carga)
+{
+  GBitmap *layer_image = gbitmap_create_with_resource(IMAGEN);
+  #ifdef PBL_PLATFORM_BASALT
+    GRect bitmap_bounds = gbitmap_get_bounds(layer_image);
+  #else
+    GRect bitmap_bounds = layer_image->bounds;
+  #endif
+  GRect frame = GRect(x, y, bitmap_bounds.size.w, bitmap_bounds.size.h);
+  BitmapLayer *layer = bitmap_layer_create(frame);
+  
+  if (Carga)
+    bitmap_layer_set_bitmap(layer, layer_image);
+	return layer;
+}
+
 static void init(void) {
   
   carga_preferencias();
   
   window = window_create();
   if (window == NULL) {
-      //APP_LOG(APP_LOG_LEVEL_DEBUG, "OOM: couldn't allocate window");
       return;
   }
-  window_stack_push(window, true /* Animated */);
+  window_stack_push(window, true);
   window_layer = window_get_root_layer(window);
   
   GFont fuente_hora = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FUENTE_HORA_64));
@@ -364,73 +391,34 @@ static void init(void) {
 
 	
   background_image = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_BACKGROUND);
+  background_image_color = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_BACKGROUND_COLOR);
+
   background_layer = bitmap_layer_create(layer_get_frame(window_layer));
-  bitmap_layer_set_bitmap(background_layer, background_image);
+  #ifdef PBL_COLOR 
+    bitmap_layer_set_bitmap(background_layer, background_image_color);
+  #else
+    bitmap_layer_set_bitmap(background_layer, background_image);  
+  #endif
+  if (BW)
+    bitmap_layer_set_bitmap(background_layer, background_image);  
+
   layer_add_child(window_layer, bitmap_layer_get_layer(background_layer));
-
   
+  porcentaje_layer = crea_capa_grafica(27, 41, RESOURCE_ID_IMAGE_TINY_PERCENT, 1);
+  layer_add_child(window_layer, bitmap_layer_get_layer(porcentaje_layer));
   
+  meter_bar_layer = crea_capa_grafica(13, 70, RESOURCE_ID_IMAGE_METER_BAR, 1);
+  layer_add_child(window_layer, bitmap_layer_get_layer(meter_bar_layer));
+  if (BluetoothVibe == 1)
+    layer_add_child(window_layer, bitmap_layer_get_layer(meter_bar_layer)); 
   
-  porcentaje_image = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_TINY_PERCENT);
-  #ifdef PBL_PLATFORM_BASALT
-    GRect bitmap_bounds0 = gbitmap_get_bounds(porcentaje_image);
-  #else
-    GRect bitmap_bounds0 = porcentaje_image->bounds;
-  #endif
-  GRect frame0 = GRect(27, 41, bitmap_bounds0.size.w, bitmap_bounds0.size.h);
-  
-  porcentaje_layer = bitmap_layer_create(frame0);
-  bitmap_layer_set_bitmap(porcentaje_layer, porcentaje_image);
-  layer_add_child(window_layer, bitmap_layer_get_layer(porcentaje_layer));   
-
-
-    meter_bar_image = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_METER_BAR);
-    #ifdef PBL_PLATFORM_BASALT
-      GRect bitmap_bounds2 = gbitmap_get_bounds(meter_bar_image);
-    #else
-      GRect bitmap_bounds2 = meter_bar_image->bounds;
-    #endif
-    GRect frame2 = GRect(13, 70, bitmap_bounds2.size.w, bitmap_bounds2.size.h);
-    meter_bar_layer = bitmap_layer_create(frame2);
-    bitmap_layer_set_bitmap(meter_bar_layer, meter_bar_image);
-    if (BluetoothVibe == 1)
-      layer_add_child(window_layer, bitmap_layer_get_layer(meter_bar_layer)); 
-
-  bluetooth_image = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_BLUETOOTH);
-  #ifdef PBL_PLATFORM_BASALT
-    GRect bitmap_bounds3 = gbitmap_get_bounds(bluetooth_image);
-  #else
-    GRect bitmap_bounds3 = bluetooth_image->bounds;
-  #endif
-  GRect frame3 = GRect(29, 70, bitmap_bounds3.size.w, bitmap_bounds3.size.h);
-  bluetooth_layer = bitmap_layer_create(frame3);
-  bitmap_layer_set_bitmap(bluetooth_layer, bluetooth_image);
+  bluetooth_layer = crea_capa_grafica(29, 70, RESOURCE_ID_IMAGE_BLUETOOTH, 1);
   layer_add_child(window_layer, bitmap_layer_get_layer(bluetooth_layer));
 
-  battery_image = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_BATTERY);
   
-  #ifdef PBL_PLATFORM_BASALT
-    GRect bitmap_bounds4 = gbitmap_get_bounds(battery_image);
-  #else
-    GRect bitmap_bounds4 = battery_image->bounds;
-  #endif
-  GRect frame4 = GRect(13, 51, bitmap_bounds4.size.w, bitmap_bounds4.size.h);
-  battery_layer = bitmap_layer_create(frame4);
-  battery_image_layer = bitmap_layer_create(frame4);
-  bitmap_layer_set_bitmap(battery_image_layer, battery_image);
-  layer_set_update_proc(bitmap_layer_get_layer(battery_layer), battery_layer_update_callback);
-  
-  layer_add_child(window_layer, bitmap_layer_get_layer(battery_image_layer));
-  layer_add_child(window_layer, bitmap_layer_get_layer(battery_layer));
-  
-  GRect frame5 = (GRect) {
-    .origin = { .x = 13, .y = 83 },
-    .size = {.w = 19, .h = 8}
-  };
-  time_format_layer = bitmap_layer_create(frame5);
+  time_format_layer = bitmap_layer_create(GRect(13,83,19,8));
   time_format_image24 = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_24_HOUR_MODE);
   time_format_image = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_PM_MODE);
-
   if (clock_is_24h_style()) {
     time_format_image24 = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_24_HOUR_MODE);
     bitmap_layer_set_bitmap(time_format_layer, time_format_image24); 
@@ -438,55 +426,36 @@ static void init(void) {
   layer_add_child(window_layer, bitmap_layer_get_layer(time_format_layer));
   
   
- 
+  battery_image_layer = crea_capa_grafica(13, 51, RESOURCE_ID_IMAGE_BATTERY, 1);
+  layer_add_child(window_layer, bitmap_layer_get_layer(battery_image_layer));
+  
+  battery_layer = crea_capa_grafica(13, 51, RESOURCE_ID_IMAGE_BATTERY ,0);
+  layer_set_update_proc(bitmap_layer_get_layer(battery_layer), battery_layer_update_callback);
+  layer_add_child(window_layer, bitmap_layer_get_layer(battery_layer));
+  
   // EMPIEZAN LOS CARACTERES
   
-  /*
-  text_layer_hora = text_layer_create((GRect) { .origin = { 7, 69 }, .size = { 100, 70 } });
-  text_layer_set_font(text_layer_hora, fuente_hora);
-  text_layer_set_text_alignment(text_layer_hora, GTextAlignmentRight);
-  text_layer_set_background_color(text_layer_hora, GColorClear);
+  text_layer_hora = crea_capa_texto(GRect(7, 69, 100, 70), GColorBlack, GColorClear, fuente_hora, GTextAlignmentRight);
   layer_add_child(window_layer, text_layer_get_layer(text_layer_hora));
-  */
-  
-  text_layer_hora = init_text_layer(GRect(7, 69, 100, 70), GColorBlack, GColorClear, fuente_hora, GTextAlignmentLeft);
-	layer_add_child(window_layer, text_layer_get_layer(text_layer_hora));
 
-  //crea_capa_texto(text_layer_hora, (GRect) {.origin={7,69},.size={100,70}},fuente_hora, GTextAlignmentRight, GColorClear, window_layer);
-  //layer_add_child(window_layer, text_layer_get_layer(text_layer_hora));
+  text_layer_segundos = crea_capa_texto(GRect(107, 106, 40, 40), GColorBlack, GColorClear, fuente_segundos, GTextAlignmentLeft);
+	layer_add_child(window_layer, text_layer_get_layer(text_layer_segundos));
+
+  text_layer_fecha1 = crea_capa_texto(GRect(72, 62, 40, 40), GColorBlack, GColorClear, fuente_fecha, GTextAlignmentLeft);
+	layer_add_child(window_layer, text_layer_get_layer(text_layer_fecha1));
+
+  text_layer_fecha2 = crea_capa_texto(GRect(110, 62, 40, 40), GColorBlack, GColorClear, fuente_fecha, GTextAlignmentLeft);
+	layer_add_child(window_layer, text_layer_get_layer(text_layer_fecha2));
+
+  text_layer_letras = crea_capa_texto(GRect(41, 33, 70, 40), GColorBlack, GColorClear, fuente_letras, GTextAlignmentLeft);
+	layer_add_child(window_layer, text_layer_get_layer(text_layer_letras));
 
   
-  text_layer_segundos = text_layer_create((GRect) { .origin = { 107, 106 }, .size = { 40, 40 } });
-  text_layer_set_font(text_layer_segundos, fuente_segundos);
-  text_layer_set_background_color(text_layer_segundos, GColorClear);
-  layer_add_child(window_layer, text_layer_get_layer(text_layer_segundos));
-  
-  text_layer_fecha1 = text_layer_create((GRect) { .origin = { 72, 62}, .size = { 40, 40 } });
-  text_layer_set_font(text_layer_fecha1, fuente_fecha);
-  text_layer_set_background_color(text_layer_fecha1, GColorClear);
-  layer_add_child(window_layer, text_layer_get_layer(text_layer_fecha1));
-  
-  text_layer_fecha2 = text_layer_create((GRect) { .origin = { 110, 62}, .size = { 40, 40 } });
-  text_layer_set_font(text_layer_fecha2, fuente_fecha);
-  text_layer_set_background_color(text_layer_fecha2, GColorClear);
-  layer_add_child(window_layer, text_layer_get_layer(text_layer_fecha2));
-    
-  
-  text_layer_letras = text_layer_create((GRect) { .origin = { 41, 33}, .size = { 70, 40 } });
-  text_layer_set_font(text_layer_letras, fuente_letras);
-  text_layer_set_background_color(text_layer_letras, GColorClear);
-  layer_add_child(window_layer, text_layer_get_layer(text_layer_letras));
-  
-  text_layer_ano = text_layer_create((GRect) { .origin = { 102, 33}, .size = { 70, 40 } });
-  text_layer_set_font(text_layer_ano, fuente_letras);
-  text_layer_set_background_color(text_layer_ano, GColorClear);
-  layer_add_child(window_layer, text_layer_get_layer(text_layer_ano));
-  
-  text_layer_bateria = text_layer_create((GRect) { .origin = { 14, 41}, .size = { 30, 30 } });
-  text_layer_set_font(text_layer_bateria, fuente_bateria);
-  text_layer_set_background_color(text_layer_bateria, GColorClear);
-  layer_add_child(window_layer, text_layer_get_layer(text_layer_bateria));
-  
+  text_layer_ano = crea_capa_texto(GRect(102, 33, 70, 40), GColorBlack, GColorClear, fuente_letras, GTextAlignmentLeft);
+	layer_add_child(window_layer, text_layer_get_layer(text_layer_ano));
+
+  text_layer_bateria = crea_capa_texto(GRect(10, 41, 15, 15), GColorBlack, GColorClear, fuente_bateria, GTextAlignmentRight);
+	layer_add_child(window_layer, text_layer_get_layer(text_layer_bateria));
   
   // AQUI ACABAN LOS CARACTERES
  
@@ -531,13 +500,9 @@ static void deinit(void) {
   
   layer_remove_from_parent(bitmap_layer_get_layer(meter_bar_layer));
   bitmap_layer_destroy(meter_bar_layer);
-  gbitmap_destroy(meter_bar_image);
-  background_image = NULL;
 	
   layer_remove_from_parent(bitmap_layer_get_layer(bluetooth_layer));
   bitmap_layer_destroy(bluetooth_layer);
-  gbitmap_destroy(bluetooth_image);
-  bluetooth_image = NULL;
 	
   layer_remove_from_parent(bitmap_layer_get_layer(battery_layer));
   bitmap_layer_destroy(battery_layer);

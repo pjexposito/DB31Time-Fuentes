@@ -1,5 +1,6 @@
 {
     "appKeys": {
+        "KEY_BW": 5,
         "KEY_DATEFORMAT": 2,
         "KEY_HOURLYVIBE": 4,
         "KEY_IDIOMA": 0,
@@ -14,6 +15,11 @@
     "projectType": "native",
     "resources": {
         "media": [
+            {
+                "file": "images/fondo-c.png",
+                "name": "IMAGE_BACKGROUND_COLOR",
+                "type": "png"
+            },
             {
                 "file": "images/fondo.png",
                 "name": "IMAGE_BACKGROUND",
