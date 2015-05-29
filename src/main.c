@@ -17,7 +17,7 @@
 #define KEY_DATEFORMAT 2
 #define KEY_SEGUNDOS 3
 #define KEY_HOURLYVIBE 4
-#define KEY_BW 5
+#define KEY_BACK 5
   
 static Window *window;
 static Layer *window_layer;
@@ -44,30 +44,26 @@ static bool HourlyVibe;
 // True muestra el segundero. Con False, desaparece.
 static bool SEGUNDOS;
 
-static bool BW;
+// True muestra el fondo en blanco y negro. Con False, se muestra en color.
+static int BACK;
 
 static bool appStarted = false;
 
 static GBitmap *background_image;
 static GBitmap *background_image_color;
-static BitmapLayer *background_layer;
-
-static BitmapLayer *meter_bar_layer;
-
-static BitmapLayer *bluetooth_layer;
-
-static BitmapLayer *porcentaje_layer;
+static GBitmap *background_image_color_ns;
 
 static GBitmap *battery_image;
-static BitmapLayer *battery_image_layer;
-static BitmapLayer *battery_layer;
-
 static GBitmap *time_format_image;
 static GBitmap *time_format_image24;
 
 static BitmapLayer *time_format_layer;
-
-
+static BitmapLayer *background_layer;
+static BitmapLayer *meter_bar_layer;
+static BitmapLayer *bluetooth_layer;
+static BitmapLayer *porcentaje_layer;
+static BitmapLayer *battery_image_layer;
+static BitmapLayer *battery_layer;
 
 
 static void carga_preferencias(void)
@@ -78,7 +74,7 @@ static void carga_preferencias(void)
     BluetoothVibe = persist_exists(KEY_VIBE) ? persist_read_bool(KEY_VIBE) : 1;
     SEGUNDOS = persist_exists(KEY_SEGUNDOS) ? persist_read_bool(KEY_SEGUNDOS) : 1;
     HourlyVibe = persist_exists(KEY_HOURLYVIBE) ? persist_read_bool(KEY_HOURLYVIBE) : 0;
-    BW = persist_exists(KEY_BW) ? persist_read_bool(KEY_BW) : 0;
+    BACK = persist_exists(KEY_BACK) ? persist_read_int(KEY_BACK) : 0;
   
   }
 
@@ -93,7 +89,7 @@ static void in_recv_handler(DictionaryIterator *iterator, void *context)
   Tuple *key_dateformat_tuple = dict_find(iterator, KEY_DATEFORMAT);
   Tuple *key_segundos_tuple = dict_find(iterator, KEY_SEGUNDOS);
   Tuple *key_hourlyvibe_tuple = dict_find(iterator, KEY_HOURLYVIBE);
-  Tuple *key_bw_tuple = dict_find(iterator, KEY_BW);  
+  Tuple *key_bw_tuple = dict_find(iterator, KEY_BACK);  
 
   if(strcmp(key_idioma_tuple->value->cstring, "spanish") == 0)
     persist_write_int(KEY_IDIOMA, 1);
@@ -131,10 +127,12 @@ static void in_recv_handler(DictionaryIterator *iterator, void *context)
   else if(strcmp(key_hourlyvibe_tuple->value->cstring, "off") == 0)
      persist_write_bool(KEY_HOURLYVIBE, 0);
 
-  if(strcmp(key_bw_tuple->value->cstring, "on") == 0)
-     persist_write_bool(KEY_BW, 1);
-  else if(strcmp(key_bw_tuple->value->cstring, "off") == 0)
-     persist_write_bool(KEY_BW, 0);  
+  if(strcmp(key_bw_tuple->value->cstring, "bw") == 0)
+     persist_write_int(KEY_BACK, 0);
+  else if(strcmp(key_bw_tuple->value->cstring, "color") == 0)
+     persist_write_int(KEY_BACK, 1);  
+  else if(strcmp(key_bw_tuple->value->cstring, "ns") == 0)
+     persist_write_int(KEY_BACK, 2);  
   
   // Vuelve a dibujar el reloj tras cerrar las preferencias
   carga_preferencias();
@@ -156,10 +154,12 @@ static void in_recv_handler(DictionaryIterator *iterator, void *context)
   
   
   #ifdef PBL_COLOR 
-    if (BW)
+    if (BACK==0)
       bitmap_layer_set_bitmap(background_layer, background_image);
-    else
+    else if (BACK==1) 
       bitmap_layer_set_bitmap(background_layer, background_image_color);
+    else if (BACK==2) 
+      bitmap_layer_set_bitmap(background_layer, background_image_color_ns);  
   #endif
 
 
@@ -209,7 +209,7 @@ static void update_battery(BatteryChargeState charge_state) {
 
 static void toggle_bluetooth_icon(bool connected) {
   if(appStarted && !connected && BluetoothVibe) {
-    static uint32_t const segments[] = { 200, 100, 100, 100, 100, 700 };
+    static uint32_t const segments[] = { 200, 100, 100, 100, 500 };
     VibePattern pat = {
       .durations = segments,
       .num_segments = ARRAY_LENGTH(segments),
@@ -388,19 +388,22 @@ static void init(void) {
   GFont fuente_letras = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FUENTE_LETRAS_24));
   GFont fuente_bateria = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FUENTE_BATERIA_8));
   
-
 	
   background_image = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_BACKGROUND);
   background_image_color = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_BACKGROUND_COLOR);
-
+  background_image_color_ns = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_BACKGROUND_COLOR_NS);
   background_layer = bitmap_layer_create(layer_get_frame(window_layer));
   #ifdef PBL_COLOR 
-    bitmap_layer_set_bitmap(background_layer, background_image_color);
+    if (BACK==0)
+      bitmap_layer_set_bitmap(background_layer, background_image);
+    else if (BACK==1) 
+      bitmap_layer_set_bitmap(background_layer, background_image_color);
+    else if (BACK==2) 
+      bitmap_layer_set_bitmap(background_layer, background_image_color_ns);  
   #else
     bitmap_layer_set_bitmap(background_layer, background_image);  
   #endif
-  if (BW)
-    bitmap_layer_set_bitmap(background_layer, background_image);  
+
 
   layer_add_child(window_layer, bitmap_layer_get_layer(background_layer));
   
@@ -459,7 +462,6 @@ static void init(void) {
   
   // AQUI ACABAN LOS CARACTERES
  
-    
   toggle_bluetooth_icon(bluetooth_connection_service_peek());
   update_battery(battery_state_service_peek());
 
@@ -524,7 +526,6 @@ static void deinit(void) {
   text_layer_destroy(text_layer_ano);
   text_layer_destroy(text_layer_fecha2);
   text_layer_destroy(text_layer_bateria);
-
 	
   layer_remove_from_parent(window_layer);
   layer_destroy(window_layer);

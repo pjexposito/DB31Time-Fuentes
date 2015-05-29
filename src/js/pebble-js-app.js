@@ -16,7 +16,7 @@ Pebble.addEventListener("showConfiguration",
 Pebble.addEventListener("webviewclosed",
   function(e) {
     var configuration = JSON.parse(decodeURIComponent(e.response));
-    console.log("Datos devueltos: " + JSON.stringify(configuration));
+    //console.log("Datos devueltos: " + JSON.stringify(configuration));
  
     //Send to Pebble, persist there
     Pebble.sendAppMessage(
@@ -25,7 +25,7 @@ Pebble.addEventListener("webviewclosed",
        "KEY_DATEFORMAT": configuration.dateformat,
        "KEY_SEGUNDOS": configuration.segundos,
        "KEY_HOURLYVIBE": configuration.hourlyvibe,
-       "KEY_BW": configuration.bw
+       "KEY_BACK": configuration.back
       },
       function(e) {
         //console.log("Mandando datos...");

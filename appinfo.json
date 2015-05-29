@@ -1,6 +1,6 @@
 {
     "appKeys": {
-        "KEY_BW": 5,
+        "KEY_BACK": 5,
         "KEY_DATEFORMAT": 2,
         "KEY_HOURLYVIBE": 4,
         "KEY_IDIOMA": 0,
@@ -15,6 +15,11 @@
     "projectType": "native",
     "resources": {
         "media": [
+            {
+                "file": "images/fondocolor-sinsombras.png",
+                "name": "IMAGE_BACKGROUND_COLOR_NS",
+                "type": "png"
+            },
             {
                 "file": "images/fondo-c.png",
                 "name": "IMAGE_BACKGROUND_COLOR",
@@ -106,7 +111,7 @@
         "basalt"
     ],
     "uuid": "421ac8ac-f3e0-11e4-b9b2-1697f925ec7b",
-    "versionLabel": "0.3",
+    "versionLabel": "0.5",
     "watchapp": {
         "watchface": true
     }
